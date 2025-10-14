@@ -254,3 +254,33 @@ resource "aws_route53_record" "alias_aaaa" {
   }
 }
 
+resource "aws_cloudfront_function" "mkdocs_router" {
+  name    = replace("mkdocs-router-${var.domain_name}", "/[^a-zA-Z0-9-_]/", "-")
+  runtime = "cloudfront-js-2.0"
+  publish = true
+  code    = templatefile("${path.module}/cloudfront/mkdocs_router.js", {})
+  # If you ever change code and need a new name quickly, tack on a suffix.
+}
+
+# Attach on viewer-request when any feature is enabled
+locals {
+  need_router_fn = var.enable_clean_urls || var.canonical_host != null || var.force_https
+}
+
+# In your existing aws_cloudfront_distribution.cdn default_cache_behavior block, add:
+# (showing just the new dynamic)
+# ...
+default_cache_behavior {
+  # existing settings...
+  cache_policy_id             = var.cache_policy_id
+  response_headers_policy_id  = var.response_headers_policy_id
+
+  dynamic "function_association" {
+    for_each = local.need_router_fn ? [1] : []
+    content {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.mkdocs_router.arn
+    }
+  }
+}
+
