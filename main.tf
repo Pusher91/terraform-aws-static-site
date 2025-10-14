@@ -1,7 +1,7 @@
 locals {
-  aliases_all  = distinct(concat([var.domain_name], var.aliases))
-  bucket_name  = coalesce(var.bucket_name, replace(var.domain_name, ".", "-"))
-  logs_bucket  = var.logs_bucket_name != null ? var.logs_bucket_name : "${local.bucket_name}-logs"
+  aliases_all      = distinct(concat([var.domain_name], var.aliases))
+  bucket_name      = coalesce(var.bucket_name, replace(var.domain_name, ".", "-"))
+  logs_bucket      = var.logs_bucket_name != null ? var.logs_bucket_name : "${local.bucket_name}-logs"
 
   # CloudFront Function wiring
   canonical_host_s = coalesce(var.canonical_host, "")
@@ -26,17 +26,26 @@ resource "aws_s3_bucket_public_access_block" "site" {
 
 resource "aws_s3_bucket_ownership_controls" "site" {
   bucket = aws_s3_bucket.site.id
-  rule { object_ownership = "BucketOwnerEnforced" }
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "site" {
   bucket = aws_s3_bucket.site.id
-  rule { apply_server_side_encryption_by_default { sse_algorithm = "AES256" } }
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
 }
 
 resource "aws_s3_bucket_versioning" "site" {
   bucket = aws_s3_bucket.site.id
-  versioning_configuration { status = var.enable_bucket_versioning ? "Enabled" : "Suspended" }
+  versioning_configuration {
+    status = var.enable_bucket_versioning ? "Enabled" : "Suspended"
+  }
 }
 
 # --- Optional CloudFront logs bucket ---
@@ -50,31 +59,55 @@ resource "aws_s3_bucket" "logs" {
 resource "aws_s3_bucket_ownership_controls" "logs" {
   count  = var.enable_logs && var.logs_bucket_name == null ? 1 : 0
   bucket = aws_s3_bucket.logs[0].id
-  rule { object_ownership = "BucketOwnerPreferred" }
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "logs" {
   count  = var.enable_logs && var.logs_bucket_name == null ? 1 : 0
   bucket = aws_s3_bucket.logs[0].id
-  rule { apply_server_side_encryption_by_default { sse_algorithm = "AES256" } }
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
 }
 
 data "aws_iam_policy_document" "logs" {
   count = var.enable_logs && var.logs_bucket_name == null ? 1 : 0
+
   statement {
-    sid       = "AWSCloudFrontLogDelivery"
-    effect    = "Allow"
-    actions   = ["s3:PutObject"]
-    principals { type = "Service", identifiers = ["delivery.logs.amazonaws.com"] }
-    resources  = ["arn:aws:s3:::${aws_s3_bucket.logs[0].bucket}/*"]
-    condition  { test = "StringEquals", variable = "s3:x-amz-acl", values = ["bucket-owner-full-control"] }
+    sid     = "AWSCloudFrontLogDelivery"
+    effect  = "Allow"
+    actions = ["s3:PutObject"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["delivery.logs.amazonaws.com"]
+    }
+
+    resources = ["arn:aws:s3:::${aws_s3_bucket.logs[0].bucket}/*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "s3:x-amz-acl"
+      values   = ["bucket-owner-full-control"]
+    }
   }
+
   statement {
-    sid       = "AWSCloudFrontLogDeliveryAclCheck"
-    effect    = "Allow"
-    actions   = ["s3:GetBucketAcl"]
-    principals { type = "Service", identifiers = ["delivery.logs.amazonaws.com"] }
-    resources  = ["arn:aws:s3:::${aws_s3_bucket.logs[0].bucket}"]
+    sid     = "AWSCloudFrontLogDeliveryAclCheck"
+    effect  = "Allow"
+    actions = ["s3:GetBucketAcl"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["delivery.logs.amazonaws.com"]
+    }
+
+    resources = ["arn:aws:s3:::${aws_s3_bucket.logs[0].bucket}"]
   }
 }
 
@@ -93,7 +126,8 @@ resource "aws_cloudfront_origin_access_control" "oac" {
   signing_protocol                  = "sigv4"
 }
 
-# --- ACM in us-east-1 (for CloudFront) ---
+# --- ACM certificate in us-east-1 (for CloudFront) ---
+# Root module MUST pass providers { aws = aws, aws.us_east_1 = aws.us_east_1 }
 resource "aws_acm_certificate" "cert" {
   provider                 = aws.us_east_1
   count                    = var.certificate_arn == null ? 1 : 0
@@ -106,8 +140,13 @@ resource "aws_acm_certificate" "cert" {
 resource "aws_route53_record" "cert_validation" {
   for_each = var.certificate_arn == null ? {
     for dvo in aws_acm_certificate.cert[0].domain_validation_options :
-    dvo.domain_name => { name = dvo.resource_record_name, type = dvo.resource_record_type, value = dvo.resource_record_value }
+    dvo.domain_name => {
+      name  = dvo.resource_record_name
+      type  = dvo.resource_record_type
+      value = dvo.resource_record_value
+    }
   } : {}
+
   zone_id = var.hosted_zone_id
   name    = each.value.name
   type    = each.value.type
@@ -156,13 +195,13 @@ resource "aws_cloudfront_distribution" "cdn" {
   }
 
   default_cache_behavior {
-    target_origin_id            = "s3-${aws_s3_bucket.site.id}"
-    viewer_protocol_policy      = "redirect-to-https"
-    allowed_methods             = var.allowed_methods
-    cached_methods              = var.cached_methods
-    compress                    = true
-    cache_policy_id             = var.cache_policy_id
-    response_headers_policy_id  = var.response_headers_policy_id
+    target_origin_id           = "s3-${aws_s3_bucket.site.id}"
+    viewer_protocol_policy     = "redirect-to-https"
+    allowed_methods            = var.allowed_methods
+    cached_methods             = var.cached_methods
+    compress                   = true
+    cache_policy_id            = var.cache_policy_id
+    response_headers_policy_id = var.response_headers_policy_id
 
     dynamic "function_association" {
       for_each = local.need_router_fn ? [1] : []
@@ -173,7 +212,11 @@ resource "aws_cloudfront_distribution" "cdn" {
     }
   }
 
-  restrictions { geo_restriction { restriction_type = "none" } }
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
+    }
+  }
 
   viewer_certificate {
     acm_certificate_arn      = local.cert_arn
@@ -207,10 +250,20 @@ resource "aws_cloudfront_distribution" "cdn" {
 data "aws_iam_policy_document" "site" {
   statement {
     sid = "AllowCloudFrontServicePrincipalRead"
-    principals { type = "Service", identifiers = ["cloudfront.amazonaws.com"] }
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudfront.amazonaws.com"]
+    }
+
     actions   = ["s3:GetObject"]
     resources = ["${aws_s3_bucket.site.arn}/*"]
-    condition { test = "StringEquals", variable = "AWS:SourceArn", values = [aws_cloudfront_distribution.cdn.arn] }
+
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceArn"
+      values   = [aws_cloudfront_distribution.cdn.arn]
+    }
   }
 }
 
@@ -219,7 +272,7 @@ resource "aws_s3_bucket_policy" "site" {
   policy = data.aws_iam_policy_document.site.json
 }
 
-# --- Route53 A/AAAA alias records ---
+# --- Route53 A/AAAA alias records for all hostnames ---
 resource "aws_route53_record" "alias_a" {
   for_each = toset(local.aliases_all)
   zone_id  = var.hosted_zone_id
