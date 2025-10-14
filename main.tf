@@ -3,10 +3,11 @@ locals {
   bucket_name      = coalesce(var.bucket_name, replace(var.domain_name, ".", "-"))
   logs_bucket      = var.logs_bucket_name != null ? var.logs_bucket_name : "${local.bucket_name}-logs"
 
-  # CloudFront Function wiring
   canonical_host_s = coalesce(var.canonical_host, "")
   need_router_fn   = var.enable_clean_urls || var.canonical_host != null || var.force_https
-  cf_function_name = substr(regexreplace("mkdocs-router-${var.domain_name}", "[^a-zA-Z0-9-_]", "-"), 0, 64)
+
+  # Replace only '.' with '-' and cap at 64 chars (valid for CloudFront Function names)
+  cf_function_name = substr(replace("mkdocs-router-${var.domain_name}", ".", "-"), 0, 64)
 }
 
 # --- Site bucket (private; access only via CloudFront OAC) ---
