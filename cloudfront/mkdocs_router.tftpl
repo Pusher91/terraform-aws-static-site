@@ -1,0 +1,44 @@
+function handler(event) {
+  var req = event.request;
+  var headers = req.headers || {};
+  var uri = req.uri || "/";
+  var hostHdr = headers.host && headers.host.value ? headers.host.value : "";
+  var proto = headers["cloudfront-forwarded-proto"] ? headers["cloudfront-forwarded-proto"].value : "https";
+
+  var targetHost   = "${canonical_host}";
+  var enforceHost  = ${canonical_host != "" ? "true" : "false"};
+  var enforceHttps = ${force_https ? "true" : "false"};
+  var doCleanUrls  = ${enable_clean_urls ? "true" : "false"};
+
+  function qs(obj) {
+    var s = [];
+    for (var k in obj) {
+      if (!obj[k]) continue;
+      if (obj[k].multiValue) {
+        for (var i = 0; i < obj[k].multiValue.length; i++) s.push(k + "=" + obj[k].multiValue[i].value);
+      } else if (obj[k].value) {
+        s.push(k + "=" + obj[k].value);
+      }
+    }
+    return s.length ? "?" + s.join("&") : "";
+  }
+
+  if ((enforceHost && hostHdr.toLowerCase() !== targetHost.toLowerCase()) || (enforceHttps && proto !== "https")) {
+    var location = "https://" + (enforceHost ? targetHost : hostHdr) + uri + qs(req.querystring || {});
+    return {
+      statusCode: 301,
+      statusDescription: "Moved Permanently",
+      headers: { location: { value: location }, "cache-control": { value: "public, max-age=300" } }
+    };
+  }
+
+  if (doCleanUrls) {
+    if (uri.endsWith("/")) {
+      req.uri = uri + "index.html";
+    } else if (uri.lastIndexOf(".") < uri.lastIndexOf("/")) {
+      req.uri = uri + "/index.html";
+    }
+  }
+  return req;
+}
+

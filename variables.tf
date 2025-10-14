@@ -126,3 +126,18 @@ variable "tags" {
   default     = {}
 }
 
+variable "canonical_host" {
+  description = "If set, redirect to this host (e.g., secretsocietyrecipes.com)."
+  type        = string
+  default     = null
+}
+variable "force_https" {
+  description = "Redirect http->https."
+  type        = bool
+  default     = true
+}
+variable "enable_clean_urls" {
+  description = "Rewrite /path and /path/ to /path/index.html."
+  type        = bool
+  default     = true
+}
