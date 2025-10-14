@@ -2,8 +2,7 @@ locals {
   aliases_all      = distinct(concat([var.domain_name], var.aliases))
   bucket_name      = coalesce(var.bucket_name, replace(var.domain_name, ".", "-"))
   logs_bucket      = var.logs_bucket_name != null ? var.logs_bucket_name : "${local.bucket_name}-logs"
-
-  canonical_host_s = coalesce(var.canonical_host, "")
+  canonical_host_s = var.canonical_host != null ? var.canonical_host : ""
   need_router_fn   = var.enable_clean_urls || var.canonical_host != null || var.force_https
 
   # Replace only '.' with '-' and cap at 64 chars (valid for CloudFront Function names)
