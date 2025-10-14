@@ -1,0 +1,16 @@
+# Python / MkDocs
+.venv/
+__pycache__/
+site/
+
+# Terraform
+.terraform/
+terraform.tfstate
+terraform.tfstate.*
+crash.log
+
+# Misc
+.DS_Store
+.idea/
+.vscode/
+

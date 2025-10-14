@@ -1,0 +1,9 @@
+site_name: Your Site Name
+site_url: https://example.com
+theme:
+  name: material
+nav:
+  - Home: index.md
+plugins:
+  - search
+
