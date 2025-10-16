@@ -258,6 +258,7 @@ resource "aws_cloudfront_distribution" "cdn" {
     response_page_path    = "/404.html"
     error_caching_min_ttl = 0
   }
+
 }
 
 # --- S3 bucket policy: allow only this distribution (OAC) to read objects ---
